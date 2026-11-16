@@ -1341,6 +1341,25 @@ html.lumen-back .content { animation-name: lumen-wipe-up; }
 @keyframes lumen-slide { from { opacity: 0.3; transform: translateX(40px); filter: blur(10px); } to { opacity: 1; transform: none; filter: blur(0); } }
 .card, .stat, .pill { transition: background 300ms var(--ease), border-color 300ms var(--ease); }
 
+
+/* ---- Workspace switcher (shared by AMC Receivables and Ascensor Collections) ---- */
+.ws-pop { position: fixed; z-index: 300; width: 268px; padding: 6px; border-radius: 16px; background: var(--surface-2); border: 1px solid var(--edge); box-shadow: var(--shadow-3); animation: lumen-pop 220ms cubic-bezier(.2,.8,.2,1); transform-origin: top left; }
+.ws-cap { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-3); padding: 8px 10px 6px; }
+.ws-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border-radius: 11px; border: 0; background: none; color: var(--ink); text-align: left; text-decoration: none; font: inherit; cursor: pointer; transition: background 200ms; }
+.ws-item:hover, .ws-item:focus-visible { background: var(--hover-2); }
+.ws-item[aria-current="true"] { cursor: default; background: var(--hover); }
+.ws-mark { width: 32px; height: 32px; border-radius: 50%; background: var(--paper); color: var(--on-paper); display: grid; place-items: center; font-size: 11px; font-weight: 700; flex: none; }
+.ws-item b { display: block; font-size: 13.5px; font-weight: 600; line-height: 1.25; }
+.ws-item small { display: block; font-size: 11.5px; color: var(--ink-3); }
+.ws-item em { margin-left: auto; font-style: normal; font-size: 10.5px; font-weight: 600; color: var(--ink-3); border: 1px solid var(--edge); border-radius: 999px; padding: 2px 8px; }
+/* The brand block opens the workspace switcher */
+.rail-brand .brand-mark, .rail-brand .brand-text { cursor: pointer; }
+.rail-brand .brand-mark { position: relative; transition: transform 150ms var(--ease); }
+.rail-brand .brand-mark:active { transform: scale(0.94); }
+.rail-brand .brand-mark::after { content: ''; position: absolute; right: -4px; bottom: -4px; width: 15px; height: 15px; border-radius: 50%; border: 1px solid var(--edge);
+  background: var(--surface) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238C8984' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M7 9l5-5 5 5M7 15l5 5 5-5'/%3E%3C/svg%3E") center / 9px no-repeat; }
+.rail-brand .brand-text:hover b { text-decoration: underline; text-decoration-color: var(--edge-hi); text-underline-offset: 3px; }
+
 @media (max-width: 1240px) { .find-btn { width: 38px; padding: 0; justify-content: center; } }
 @media (max-width: 1020px) {
   .rail { inset: 0 auto 0 0; border-radius: 0 22px 22px 0; background: var(--rail); border-left: 0; }
@@ -37117,6 +37136,57 @@ function AccessRequestsScreen() {
    app data, and the app works the same if this script is removed. */
 (function () {
   'use strict';
+  var WS_CURRENT = 'amc';
+  /* Workspace switcher: the brand block opens a small menu to move between the two sites. */
+  var WS = [
+    { id: 'amc', name: 'AMC Receivables', sub: 'Lift maintenance contracts', href: 'index.html', mark: 'AMC' },
+    { id: 'collections', name: 'Ascensor Collections', sub: 'Lift project contracts', href: 'collections.html', mark: 'AC' }
+  ];
+  var wsPop = null, wsAnchor = null;
+  function wsClose() { if (wsPop) { wsPop.remove(); wsPop = null; if (wsAnchor) wsAnchor.setAttribute('aria-expanded', 'false'); } }
+  function wsOpen(anchor, rectEl) {
+    if (wsPop) { wsClose(); return; }
+    wsAnchor = anchor;
+    var pop = document.createElement('div');
+    pop.className = 'ws-pop'; pop.setAttribute('role', 'menu'); pop.setAttribute('aria-label', 'Switch workspace');
+    var cap = document.createElement('div'); cap.className = 'ws-cap'; cap.textContent = 'Switch workspace'; pop.appendChild(cap);
+    WS.forEach(function (w) {
+      var cur = w.id === WS_CURRENT, el = document.createElement(cur ? 'div' : 'a');
+      el.className = 'ws-item'; el.setAttribute('role', 'menuitem');
+      if (cur) el.setAttribute('aria-current', 'true'); else el.href = w.href;
+      var m = document.createElement('span'); m.className = 'ws-mark'; m.textContent = w.mark;
+      var t = document.createElement('span'), b = document.createElement('b'), s = document.createElement('small');
+      b.textContent = w.name; s.textContent = w.sub; t.appendChild(b); t.appendChild(s);
+      el.appendChild(m); el.appendChild(t);
+      if (cur) { var e = document.createElement('em'); e.textContent = 'Open'; el.appendChild(e); }
+      pop.appendChild(el);
+    });
+    document.body.appendChild(pop);
+    var r = (rectEl || anchor).getBoundingClientRect();
+    pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 276)) + 'px';
+    pop.style.top = Math.min(r.bottom + 8, window.innerHeight - pop.offsetHeight - 8) + 'px';
+    wsPop = pop; anchor.setAttribute('aria-expanded', 'true');
+    var link = pop.querySelector('a'); if (link) link.focus({ preventScroll: true });
+  }
+  document.addEventListener('click', function (e) { if (wsPop && !wsPop.contains(e.target) && !(wsAnchor && wsAnchor.contains(e.target)) && !e.target.closest('[data-ws]')) wsClose(); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && wsPop) { wsClose(); if (wsAnchor) wsAnchor.focus(); } });
+  window.addEventListener('resize', wsClose);
+  function wsBrand() {
+    var mark = document.querySelector('.rail-brand .brand-mark');
+    if (mark && !mark.hasAttribute('data-ws')) {
+      mark.setAttribute('data-ws', ''); mark.setAttribute('role', 'button'); mark.setAttribute('tabindex', '0');
+      mark.setAttribute('aria-haspopup', 'menu'); mark.setAttribute('aria-expanded', 'false');
+      mark.setAttribute('aria-label', 'Switch workspace'); mark.setAttribute('title', 'Switch workspace');
+    }
+  }
+  document.addEventListener('click', function (e) {
+    var brand = e.target.closest && e.target.closest('.rail-brand');
+    if (!brand || e.target.closest('.rail-collapse')) return;
+    var mark = brand.querySelector('.brand-mark'); if (mark) wsOpen(mark, brand);
+  });
+  document.addEventListener('keydown', function (e) {
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.matches && e.target.matches('.rail-brand .brand-mark')) { e.preventDefault(); wsOpen(e.target, e.target.closest('.rail-brand')); }
+  });
   var root = document.documentElement, lastIdx = -1, lastKey = '', lastContent = null, settle = 0;
   function place(still) {
     var rail = document.querySelector('.rail');
@@ -37174,6 +37244,7 @@ function AccessRequestsScreen() {
   }
   function allSegs() { var l = document.querySelectorAll('.segmented'); for (var i = 0; i < l.length; i++) seg(l[i], true); }
   function check() {
+    wsBrand();
     var rail = document.querySelector('.rail');
     if (!rail) { if (lastKey) { lastKey = ''; lastIdx = -1; root.classList.remove('lumen-ind'); } return; }
     var list = rail.querySelectorAll('.rail-item'), idx = -1;
